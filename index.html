@@ -118,6 +118,15 @@
         .replaceAll(',', '');
 };`
 
+                const TS_COMPILER_OPTIONS = {
+                    target: ts.ScriptTarget.ES2015,
+                    module: ts.ModuleKind.None,
+                    strict: true,
+                    noImplicitAny: true,
+                    strictNullChecks: true,
+                    noLib: true
+                };
+
         function CodeEditor({ code, onChange }) {
             const editorRef = React.useRef(null);
 
@@ -142,13 +151,7 @@
                                 );
 
                                 // Create a program
-                                const compilerOptions = {
-                                    target: ts.ScriptTarget.ES2015,
-                                    module: ts.ModuleKind.None,
-                                    strict: true,
-                                    noImplicitAny: true,
-                                    strictNullChecks: true
-                                };
+                                const compilerOptions = TS_COMPILER_OPTIONS;
 
                                 const host = {
                                     getSourceFile: (fileName) => fileName === 'test.ts' ? sourceFile : undefined,
@@ -158,9 +161,11 @@
                                     getCanonicalFileName: (fileName) => fileName,
                                     useCaseSensitiveFileNames: () => true,
                                     getNewLine: () => '\n',
-                                    fileExists: () => true,
+                                    fileExists: (fileName) => {
+                                        return fileName === 'test.ts' || fileName === 'lib.d.ts';
+                                    },
                                     readFile: () => '',
-                                    getDefaultLibFileName: () => 'lib.d.ts'
+                                    getDefaultLibFileName: () => ''
                                 };
 
                                 const program = ts.createProgram(['test.ts'], compilerOptions, host);
@@ -274,13 +279,7 @@
             const runTests = React.useCallback((currentCode) => {
                 try {
                     // First check for compilation errors
-                    const program = ts.createProgram(['test.ts'], {
-                        target: ts.ScriptTarget.ES2015,
-                        module: ts.ModuleKind.None,
-                        strict: true,
-                        noImplicitAny: true,
-                        strictNullChecks: true
-                    }, {
+                    const program = ts.createProgram(['test.ts'], TS_COMPILER_OPTIONS, {
                         getSourceFile: (fileName) => {
                             if (fileName === 'test.ts') {
                                 return ts.createSourceFile(fileName, currentCode, ts.ScriptTarget.Latest, true);
@@ -293,9 +292,11 @@
                         getCanonicalFileName: (fileName) => fileName,
                         useCaseSensitiveFileNames: () => true,
                         getNewLine: () => '\n',
-                        fileExists: () => true,
+                        fileExists: (fileName) => {
+                            return fileName === 'test.ts' || fileName === 'lib.d.ts';
+                        },
                         readFile: () => '',
-                        getDefaultLibFileName: () => 'lib.d.ts'
+                        getDefaultLibFileName: () => ''
                     });
 
                     const diagnostics = ts.getPreEmitDiagnostics(program);
