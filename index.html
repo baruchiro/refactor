@@ -17,9 +17,9 @@
 
     <!-- Don't use this in production: -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-<!-- Add these new dependencies after the existing CodeMirror dependencies -->
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/lint/lint.css">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/lint/lint.js"></script>
+    <!-- Add these new dependencies after the existing CodeMirror dependencies -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/lint/lint.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/lint/lint.js"></script>
 
     <style>
         .container {
@@ -66,7 +66,7 @@
         .CodeMirror-lint-mark-error {
             border-bottom: 1px solid red;
         }
-        
+
         .CodeMirror-lint-tooltip {
             background-color: #ffd2d2;
             color: #000;
@@ -121,29 +121,50 @@
                         getAnnotations: (content, updateLinting, options, editor) => {
                             const errors = [];
                             try {
-                                // Compile TypeScript and get diagnostics
-                                const result = ts.transpileModule(content, {
-                                    compilerOptions: {
-                                        target: ts.ScriptTarget.ES2015,
-                                        module: ts.ModuleKind.None,
-                                        strict: true
-                                    },
-                                    reportDiagnostics: true
-                                });
+                                // Create a source file
+                                const sourceFile = ts.createSourceFile(
+                                    'test.ts',
+                                    content,
+                                    ts.ScriptTarget.Latest,
+                                    true
+                                );
 
-                                if (result.diagnostics) {
-                                    result.diagnostics.forEach(diagnostic => {
-                                        if (diagnostic.file) {
-                                            const { line, character } = diagnostic.file.getLineAndCharacterOfPosition(diagnostic.start);
-                                            errors.push({
-                                                from: CodeMirror.Pos(line, character),
-                                                to: CodeMirror.Pos(line, character + 1),
-                                                message: ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n'),
-                                                severity: 'error'
-                                            });
-                                        }
-                                    });
-                                }
+                                // Create a program
+                                const compilerOptions = {
+                                    target: ts.ScriptTarget.ES2015,
+                                    module: ts.ModuleKind.None,
+                                    strict: true,
+                                    noImplicitAny: true,
+                                    strictNullChecks: true
+                                };
+
+                                const host = {
+                                    getSourceFile: (fileName) => fileName === 'test.ts' ? sourceFile : undefined,
+                                    writeFile: () => {},
+                                    getCurrentDirectory: () => '',
+                                    getDirectories: () => [],
+                                    getCanonicalFileName: (fileName) => fileName,
+                                    useCaseSensitiveFileNames: () => true,
+                                    getNewLine: () => '\n',
+                                    fileExists: () => true,
+                                    readFile: () => '',
+                                    getDefaultLibFileName: () => 'lib.d.ts'
+                                };
+
+                                const program = ts.createProgram(['test.ts'], compilerOptions, host);
+                                const diagnostics = ts.getPreEmitDiagnostics(program);
+
+                                diagnostics.forEach(diagnostic => {
+                                    if (diagnostic.file) {
+                                        const { line, character } = diagnostic.file.getLineAndCharacterOfPosition(diagnostic.start);
+                                        errors.push({
+                                            from: CodeMirror.Pos(line, character),
+                                            to: CodeMirror.Pos(line, character + (diagnostic.length || 1)),
+                                            message: ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n'),
+                                            severity: 'error'
+                                        });
+                                    }
+                                });
                             } catch (e) {
                                 console.error('TypeScript compilation error:', e);
                             }
