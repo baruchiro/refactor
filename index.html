@@ -78,6 +78,34 @@
 <body>
     <div id="root"></div>
     <script type="text/babel">
+    const ORIGINAL_CODE = `export const formatTimestampToLocaleDate = (
+    timestamp: number,
+    locale: string,
+    options?: Intl.DateTimeFormatOptions | string
+): string => {
+    const date = dayjs(timestamp);
+    
+    if (!options) {
+        return date.format('DD/MM/YYYY');
+    }
+    
+    const DEFAULT_LOCALE = 'en-US';
+    
+    const localeToUse = locale ?? 'en-US';
+    
+    const optionsToUse = options ?? { day: '2-digit', month: '2-digit', year: 'numeric' };
+    
+    if (locale !== DEFAULT_LOCALE) {
+        return new Date()
+            .toLocaleDateString(localeToUse, optionsToUse as Intl.DateTimeFormatOptions)
+            .replaceAll(',', '');
+    }
+    
+    return new Date(timestamp * UNIX_TIMESTAMP_MULTIPLIER)
+        .toLocaleDateString(localeToUse, optionsToUse as Intl.DateTimeFormatOptions)
+        .replaceAll(',', '');
+};`
+
         function CodeEditor({ code, onChange }) {
             const editorRef = React.useRef(null);
 
@@ -187,10 +215,7 @@
         }
 
         function MyApp() {
-            const [code, setCode] = React.useState(`function sum(a: number, b: number): number {
-  // Write your code here
-  return 0;
-}`);
+            const [code, setCode] = React.useState(ORIGINAL_CODE);
 
             const [testResults, setTestResults] = React.useState([]);
 
