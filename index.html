@@ -17,6 +17,10 @@
 
     <!-- Don't use this in production: -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<!-- Add these new dependencies after the existing CodeMirror dependencies -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/lint/lint.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/lint/lint.js"></script>
+
     <style>
         .container {
             display: flex;
@@ -58,6 +62,16 @@
             min-height: 200px;
             width: 100%;
         }
+
+        .CodeMirror-lint-mark-error {
+            border-bottom: 1px solid red;
+        }
+        
+        .CodeMirror-lint-tooltip {
+            background-color: #ffd2d2;
+            color: #000;
+            border: 1px solid #db7272;
+        }
     </style>
 </head>
 
@@ -72,8 +86,42 @@
                     mode: 'text/typescript',
                     theme: 'monokai',
                     lineNumbers: true,
-                    autofocus: true,
-                    lineWrapping: true
+                    lineWrapping: true,
+                    lint: {
+                        esversion: 6,
+                        async: true,
+                        getAnnotations: (content, updateLinting, options, editor) => {
+                            const errors = [];
+                            try {
+                                // Compile TypeScript and get diagnostics
+                                const result = ts.transpileModule(content, {
+                                    compilerOptions: {
+                                        target: ts.ScriptTarget.ES2015,
+                                        module: ts.ModuleKind.None,
+                                        strict: true
+                                    },
+                                    reportDiagnostics: true
+                                });
+
+                                if (result.diagnostics) {
+                                    result.diagnostics.forEach(diagnostic => {
+                                        if (diagnostic.file) {
+                                            const { line, character } = diagnostic.file.getLineAndCharacterOfPosition(diagnostic.start);
+                                            errors.push({
+                                                from: CodeMirror.Pos(line, character),
+                                                to: CodeMirror.Pos(line, character + 1),
+                                                message: ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n'),
+                                                severity: 'error'
+                                            });
+                                        }
+                                    });
+                                }
+                            } catch (e) {
+                                console.error('TypeScript compilation error:', e);
+                            }
+                            updateLinting(editor, errors);
+                        }
+                    }
                 });
 
                 editor.setValue(code);
@@ -182,6 +230,8 @@
                     }]);
                 }
             }, []);
+
+
 
             React.useEffect(() => {
                 runTests(code);
