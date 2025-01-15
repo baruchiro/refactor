@@ -12,6 +12,8 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/theme/monokai.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/javascript/javascript.min.js"></script>
+    <!-- Add TypeScript support -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/typescript/5.0.4/typescript.min.js"></script>
 
     <!-- Don't use this in production: -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -67,7 +69,7 @@
 
             React.useEffect(() => {
                 const editor = CodeMirror.fromTextArea(editorRef.current, {
-                    mode: 'javascript',
+                    mode: 'text/typescript',
                     theme: 'monokai',
                     lineNumbers: true,
                     autofocus: true,
@@ -137,7 +139,7 @@
         }
 
         function MyApp() {
-            const [code, setCode] = React.useState(`function sum(a, b) {
+            const [code, setCode] = React.useState(`function sum(a: number, b: number): number {
   // Write your code here
   return 0;
 }`);
@@ -146,8 +148,14 @@
 
             const runTests = React.useCallback((currentCode) => {
                 try {
-                    // Create a function from the code
-                    const fn = new Function(`return ${currentCode}`)();
+                    // Compile TypeScript to JavaScript
+                    const compiledJS = ts.transpile(currentCode, {
+                        target: ts.ScriptTarget.ES2015,
+                        module: ts.ModuleKind.None
+                    });
+
+                    // Create function from compiled JavaScript
+                    const fn = new Function(`return ${compiledJS}`)();
 
                     const tests = [
                         {
