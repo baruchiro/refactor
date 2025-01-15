@@ -45,6 +45,17 @@
             background-color: #f2dede;
             color: #a94442;
         }
+
+        .readonly-line {
+            background-color: rgba(0, 0, 0, 0.1);
+            cursor: not-allowed;
+        }
+
+        .CodeMirror {
+            height: auto;
+            min-height: 200px;
+            width: 100%;
+        }
     </style>
 </head>
 
@@ -59,10 +70,44 @@
                     mode: 'javascript',
                     theme: 'monokai',
                     lineNumbers: true,
-                    autofocus: true
+                    autofocus: true,
+                    lineWrapping: true
                 });
 
                 editor.setValue(code);
+
+                // Create read-only ranges for first and last lines
+                const lastLine = editor.lineCount() - 1;
+                const readOnlyRanges = [
+                    {
+                        from: { line: 0, ch: 0 },
+                        to: { line: 0, ch: Infinity },
+                        className: 'readonly-line'
+                    },
+                    {
+                        from: { line: lastLine, ch: 0 },
+                        to: { line: lastLine, ch: Infinity },
+                        className: 'readonly-line'
+                    }
+                ];
+
+                // Apply read-only ranges
+                readOnlyRanges.forEach(range => {
+                    editor.markText(range.from, range.to, {
+                        readOnly: true,
+                        atomic: true,  // Prevents cursor from entering the range
+                        className: range.className
+                    });
+                });
+
+                editor.on('beforeChange', (cm, change) => {
+                    // Prevent any changes to read-only ranges
+                    if (change.from.line === 0 || change.to.line === 0 ||
+                        change.from.line === lastLine || change.to.line === lastLine) {
+                        change.cancel();
+                    }
+                });
+
                 editor.on('change', () => {
                     onChange(editor.getValue());
                 });
@@ -70,7 +115,9 @@
                 return () => editor.toTextArea();
             }, []);
 
-            return <textarea ref={editorRef} />;
+            return (
+                <textarea ref={editorRef} />
+            );
         }
 
         function TestResults({ results }) {
