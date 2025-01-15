@@ -72,6 +72,18 @@
             color: #000;
             border: 1px solid #db7272;
         }
+
+        .test-result pre {
+            margin: 0;
+            padding: 8px;
+            background-color: rgba(0, 0, 0, 0.05);
+            border-radius: 3px;
+        }
+        
+        .test-result.test-fail {
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
     </style>
 </head>
 
@@ -220,10 +232,14 @@
         }
 
         function TestResults({ results }) {
+            // Group results into tests and errors
+            const tests = results.filter(r => !r.error);
+            const errors = results.filter(r => r.error);
+            
             return (
                 <div>
                     <h2>Test Results</h2>
-                    {results.map((result, index) => (
+                    {tests.map((result, index) => (
                         <div
                             key={index}
                             className={`test-result ${result.passed ? 'test-pass' : 'test-fail'}`}
@@ -231,6 +247,21 @@
                             {result.title}: {result.passed ? 'Passed' : 'Failed'}
                         </div>
                     ))}
+
+                    {errors.length > 0 && (
+                        <div>
+                            <h3>Errors</h3>
+                            {errors.map((error, index) => (
+                                <div
+                                    key={`error-${index}`}
+                                    className="test-result test-fail"
+                                    style={{ whiteSpace: 'pre-wrap', fontFamily: 'monospace' }}
+                                >
+                                    {error.error}
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
             );
         }
@@ -242,30 +273,88 @@
 
             const runTests = React.useCallback((currentCode) => {
                 try {
-                    // Compile TypeScript to JavaScript
+                    // First check for compilation errors
+                    const program = ts.createProgram(['test.ts'], {
+                        target: ts.ScriptTarget.ES2015,
+                        module: ts.ModuleKind.None,
+                        strict: true,
+                        noImplicitAny: true,
+                        strictNullChecks: true
+                    }, {
+                        getSourceFile: (fileName) => {
+                            if (fileName === 'test.ts') {
+                                return ts.createSourceFile(fileName, currentCode, ts.ScriptTarget.Latest, true);
+                            }
+                            return undefined;
+                        },
+                        writeFile: () => { },
+                        getCurrentDirectory: () => '',
+                        getDirectories: () => [],
+                        getCanonicalFileName: (fileName) => fileName,
+                        useCaseSensitiveFileNames: () => true,
+                        getNewLine: () => '\n',
+                        fileExists: () => true,
+                        readFile: () => '',
+                        getDefaultLibFileName: () => 'lib.d.ts'
+                    });
+
+                    const diagnostics = ts.getPreEmitDiagnostics(program);
+                    if (diagnostics.length > 0) {
+                        throw new Error(diagnostics.map(diagnostic =>
+                            ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n')
+                        ).join('\n'));
+                    }
+
+                    // If no compilation errors, compile and run the code
                     const compiledJS = ts.transpile(currentCode, {
                         target: ts.ScriptTarget.ES2015,
                         module: ts.ModuleKind.None
                     });
 
-                    // Create function from compiled JavaScript
-                    const fn = new Function(`return ${compiledJS}`)();
+                    // Create a module-like environment to handle the export
+                    const moduleExports = {};
+                    const moduleFunction = new Function('exports', compiledJS);
+                    moduleFunction(moduleExports);
 
+                    // Get the exported function
+                    const fn = moduleExports.formatTimestampToLocaleDate;
+
+                    if (typeof fn !== 'function') {
+                        throw new Error('No function exported');
+                    }
+
+                    // Run tests
                     const tests = [
                         {
-                            title: 'Should add two positive numbers',
-                            test: () => fn(2, 3) === 5
+                            title: 'Should format timestamp with default options',
+                            test: () => {
+                                const result = fn(1625097600000, 'en-US');
+                                return result === '07/01/2021';
+                            }
                         },
                         {
-                            title: 'Should add a positive and a negative number',
-                            test: () => fn(-2, 3) === 1
+                            title: 'Should format timestamp with custom locale',
+                            test: () => {
+                                const result = fn(1625097600000, 'fr-FR');
+                                return result.includes('07') && result.includes('2021');
+                            }
                         }
                     ];
 
-                    const results = tests.map(({ title, test }) => ({
-                        title,
-                        passed: test()
-                    }));
+                    const results = tests.map(({ title, test }) => {
+                        try {
+                            return {
+                                title,
+                                passed: test()
+                            };
+                        } catch (testError) {
+                            return {
+                                title,
+                                passed: false,
+                                error: testError.message
+                            };
+                        }
+                    });
 
                     setTestResults(results);
                 } catch (error) {
@@ -276,8 +365,6 @@
                     }]);
                 }
             }, []);
-
-
 
             React.useEffect(() => {
                 runTests(code);
