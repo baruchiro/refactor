@@ -1,36 +1,157 @@
 <!DOCTYPE html>
 <html>
-  <head>
+
+<head>
     <meta charset="UTF-8" />
-    <title>Hello World</title>
+    <title>Code Editor with Tests</title>
     <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
 
+    <!-- CodeMirror dependencies -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/theme/monokai.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/javascript/javascript.min.js"></script>
+
     <!-- Don't use this in production: -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-  </head>
-  <body>
+    <style>
+        .container {
+            display: flex;
+            gap: 20px;
+            padding: 20px;
+        }
+
+        .editor-section {
+            flex: 1;
+        }
+
+        .results-section {
+            flex: 1;
+        }
+
+        .test-result {
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 4px;
+        }
+
+        .test-pass {
+            background-color: #dff0d8;
+            color: #3c763d;
+        }
+
+        .test-fail {
+            background-color: #f2dede;
+            color: #a94442;
+        }
+    </style>
+</head>
+
+<body>
     <div id="root"></div>
     <script type="text/babel">
-    
-      function MyApp() {
-        return <h1>Hello, world!</h1>;
-      }
+        function CodeEditor({ code, onChange }) {
+            const editorRef = React.useRef(null);
 
-      const container = document.getElementById('root');
-      const root = ReactDOM.createRoot(container);
-      root.render(<MyApp />);
+            React.useEffect(() => {
+                const editor = CodeMirror.fromTextArea(editorRef.current, {
+                    mode: 'javascript',
+                    theme: 'monokai',
+                    lineNumbers: true,
+                    autofocus: true
+                });
 
+                editor.setValue(code);
+                editor.on('change', () => {
+                    onChange(editor.getValue());
+                });
+
+                return () => editor.toTextArea();
+            }, []);
+
+            return <textarea ref={editorRef} />;
+        }
+
+        function TestResults({ results }) {
+            return (
+                <div>
+                    <h2>Test Results</h2>
+                    {results.map((result, index) => (
+                        <div
+                            key={index}
+                            className={`test-result ${result.passed ? 'test-pass' : 'test-fail'}`}
+                        >
+                            {result.title}: {result.passed ? 'Passed' : 'Failed'}
+                        </div>
+                    ))}
+                </div>
+            );
+        }
+
+        function MyApp() {
+            const [code, setCode] = React.useState(`function sum(a, b) {
+  // Write your code here
+  return 0;
+}`);
+
+            const [testResults, setTestResults] = React.useState([]);
+
+            const runTests = React.useCallback((currentCode) => {
+                try {
+                    // Create a function from the code
+                    const fn = new Function(`return ${currentCode}`)();
+
+                    const tests = [
+                        {
+                            title: 'Should add two positive numbers',
+                            test: () => fn(2, 3) === 5
+                        },
+                        {
+                            title: 'Should add a positive and a negative number',
+                            test: () => fn(-2, 3) === 1
+                        }
+                    ];
+
+                    const results = tests.map(({ title, test }) => ({
+                        title,
+                        passed: test()
+                    }));
+
+                    setTestResults(results);
+                } catch (error) {
+                    setTestResults([{
+                        title: 'Error',
+                        passed: false,
+                        error: error.message
+                    }]);
+                }
+            }, []);
+
+            React.useEffect(() => {
+                runTests(code);
+            }, [code, runTests]);
+
+            return (
+                <div className="container">
+                    <div className="editor-section">
+                        <h2>Code Editor</h2>
+                        <CodeEditor
+                            code={code}
+                            onChange={(newCode) => setCode(newCode)}
+                        />
+                    </div>
+                    <div className="results-section">
+                        <TestResults results={testResults} />
+                    </div>
+                </div>
+            );
+        }
+
+        const container = document.getElementById('root');
+        const root = ReactDOM.createRoot(container);
+        root.render(<MyApp />);
     </script>
-    <!--
-      Note: this page is a great way to try React but it's not suitable for production.
-      It slowly compiles JSX with Babel in the browser and uses a large development build of React.
+</body>
 
-      Read this page for starting a new React project with JSX:
-      https://react.dev/learn/start-a-new-react-project
-
-      Read this page for adding React with JSX to an existing project:
-      https://react.dev/learn/add-react-to-an-existing-project
-    -->
-  </body>
 </html>
